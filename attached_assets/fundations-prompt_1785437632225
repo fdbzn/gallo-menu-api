@@ -1,0 +1,62 @@
+    La aplicación permite a equipos, familias o roomies crear mesas de trabajo compartidas para armar menús y desglosar recetas en ingredientes. Su verdadera magia radica en conectar la toma de decisiones grupales, mediante un sistema de encuestas integrado para elegir qué comer, con la ejecución logística: generando listas de compras automáticas y dinámicas organizadas por supermercado (drag & drop), asegurando que vayas de la indecisión al carrito de compras en cuestión de minutos y sin fricciones.
+
+La aplicacion tendra:
+    1-login
+    2-logout
+    3-recuperar contraseña
+    4-Modulo de espacios de trabajo "Mesas de trabajo":
+        4.1-Crear mesa de trabajo
+        4.2-Editar mesa de trabajo
+        4.3-Eliminar mesa de trabajo
+
+
+    5-Cada mesa de trabajo contendra listas de menus:
+        5.1-Crear menu
+        5.2-Editar menu
+        5.3-Eliminar menu
+        5.4-Al dar click sobre el menu, se debera mostrar una lista de platillos en otra pantalla
+        5.5-Los menus podran ser compartidos entre usuarios autorizados, a nivel base de datos basta con que tenga ligado el id del espacio de trabajo.
+        5.6-Cuando un usuario dio acceso o relaciono un menu con otro usuario, este debe de aceptar para poder ver el menu compartido o denegar para borrar la relacion a nivel de base de datos.
+
+    6- Modulo de amigos "Invitados a la mesa": permite buscar y agregar otros usuarios como amigos para agilizar futuras comparticiones.
+        6.1-Pantalla de busqueda de usuarios accesible desde Ajustes/Perfil, bajo el nombre "Invitados a la mesa".
+        6.2-A nivel de base de datos existira una tabla de relacion de amigos entre dos usuarios; la relacion es mutua (si A agrega a B, ambos se ven como amigos).
+        6.3-Al compartir una encuesta o un menu con un usuario que no exista aun en la tabla de amigos, se creara automaticamente la relacion en ambos sentidos.
+        6.4-En los buscadores para compartir (encuestas y menus), los usuarios que ya son amigos se mostraran primero, antes que el resto de resultados.
+
+    7.-Existira una lista de platillos que debera tener:
+        7.1-Crear platillo
+            7.1.1-Se debe tener la opcion de marcar con varios checkbox, que tipo de comida es(desayuno,comida,cena,otro)
+            7.1.2-la lista de desayuno,comida,cena,otro, sera una tabla de catalogo en la base de datos.
+        7.2-Editar platillo
+        7.3-Eliminar platillo
+        7.4-Al dar click en el platillo mostrara una lista de ingredientes en otra pantalla
+        7.5-En la pantalla de ingredientes, se debe de poder:
+            7.5.1-agregar ingrediente
+            7.5.2-eliminar ingrediente
+            7.5.3-actualizar ingrediente
+        7.6-esto significa que si se borra un platillo se debera preguntar si se quiere borrar los ingredientes o debe permitir seleccionar cuales quiere borrar. A nivel base significa que puede existir un ingrediente sin relacion con ningun platillo.
+
+    8- Lista de compras. Cada menu tiene exactamente una lista de compras que se crea y elimina automaticamente junto con el menu. La lista agrega los ingredientes de todos los platillos del menu sin duplicarlos.
+        8.1-La lista se crea automaticamente al crear el menu (no hay boton manual de "crear lista").
+        8.2-Solo se puede renombrar la lista de compras (no hay opcion de eliminarla manualmente; se elimina al borrar el menu).
+        8.3-El nombre de la lista es editable desde la pantalla de lista de compras.
+        8.4-La lista de compras se mostrara como un icono de carrito dentro del encabezado del menu, antes de abrir la pantalla de detalles del menu.
+        8.5-Se debe de poder mover un ingrediente al lugar de compra con drag and drop o por seleccion con combo box, por lo que habra lugares preingresados en la base de datos.(walmart, mercado)
+        8.6-el catalogo de lugares(mercado, walmart), que se mostrara como segmentos horizontales a los que los ingregientes de la lista de compras se podran mover.
+        8.7-los elementos que no tengan lugar de compra asignado, se mostrara en una seccion separada al inicio del catalogo.
+        8.8-tambien exisitira una pantalla para administrar el crud de lugares de compra.
+        8.9-Se deben de poder agregar mas ingredientes o items a la lista de compras que no esten relacionados con algun platillo (items sueltos). Estos items sobreviven aunque se quiten platillos del menu.
+        8.10-La lista es la union de todos los ingredientes de los platillos del menu mas los items sueltos. Un ingrediente compartido por varios platillos aparece UNA SOLA VEZ (no se duplica). La relacion ingrediente<->platillo(s) es N:M y se almacena en la tabla lista_compra_item_platillos: un item puede provenir de varios platillos del menu. La validacion de no-duplicados esta garantizada por un UNIQUE (lista_compra_id, ingrediente_id) a nivel de base de datos y espejada con logica de upsert en la capa de aplicacion.
+        8.11-Si se da click sobre de un ingrediente, este debe de poder mostrar a que platillo(s) del menu pertenece (puede ser uno o varios).
+        8.12-Se debe poder asignar un item a un platillo existente o crear un nuevo platillo con el item.
+
+    9- Existira un modulo que permitira crear una "encuesta" y compartirla con otro usuario(s)
+        9.1-Al crear una encuesta, para crear las opciones podra seleccionar entre los platillos existentes en su cuenta o entre nuevos platillos que se registraran en ese intante solo con el nombre del platillo.
+        9.2-Es importante que al crear la opcion de encuesta, se ponga un autocomplete que busque los platillos existentes o que en ese intante sin hacer muchos clicks cree el nuevo platillo.
+        9.3-habra una pantalla donde se podra ver la encuesta y los resultados
+        9.4-El usuario creador puede editar la encuesta o borrarla.
+
+Diseño:
+quiero un diseño completamente mobile siguiendo las mejores practicas google material design.
+sin embargo queremos que el diseño sea

@@ -1,0 +1,486 @@
+# Prompt — Endpoints backend Gallo (Supabase)
+
+Copia este documento completo como prompt para implementar la capa de datos del backend. Auth de sesión queda en el cliente; aquí solo datos de negocio.
+
+---
+
+## Contexto del producto
+
+**Gallo** es una app móvil colaborativa para planear menús en equipo. Conecta encuestas grupales con listas de compras organizadas por lugar de compra.
+
+**Autoridad funcional:** `Docs/fundations-prompt`  
+**Esquema canónico:** `Docs/base.sql`
+
+**Migraciones (en este repo):**
+- `20260729220000_initial_schema.sql` — esquema + RLS + triggers + `agregar_amigo`
+- `20260729230000_business_rpcs.sql` — `delete_platillo`, `assign_lista_item_*`, `votar_encuesta`
+
+**Contratos de app:** métodos por dominio resumidos al final de este documento (no hace falta abrir otros archivos de código).
+
+---
+
+## Alcance
+
+### Fuera de este backend (cliente — Supabase Auth SDK)
+
+No implementes estos endpoints de auth. La app los llama con el SDK:
+
+1. `signInWithPassword` — login
+2. `signOut` — logout
+3. `resetPasswordForEmail` — recuperar contraseña
+4. `signUp` — registro (pasar `options.data.name` para el trigger `handle_new_user`)
+5. `getSession` / `onAuthStateChange` — sesión
+
+### Dentro de este backend
+
+Perfiles, mesas, menús, platillos, ingredientes, listas de compra, lugares de compra, encuestas, amigos, catálogos. Stack: **Supabase PostgREST + RPC Postgres** con RLS.
+
+---
+
+## Reglas globales (obligatorias)
+
+1. Respeta `Docs/fundations-prompt` como autoridad funcional.
+2. Usa RLS existente; no bypass salvo funciones `SECURITY DEFINER` ya definidas en `Docs/base.sql`.
+3. **No crees endpoints** para lógica ya cubierta por triggers DB:
+   - Crear `listas_compras` al insertar `menus`
+   - Sync de items al insertar/eliminar `menu_platillos`
+   - Sync al insertar/eliminar `platillo_ingredientes`
+   - Auto-amistad al insertar `menu_compartido` / `encuesta_compartida`
+4. Autenticación: header `Authorization: Bearer <jwt>` en todas las rutas de datos.
+5. Respuestas: convención PostgREST estándar (filas JSON / error).
+6. Validar ownership vía RLS + checks en RPC cuando la operación sea multi-tabla.
+7. Preferir `select` anidados de PostgREST para reducir round-trips en móvil.
+8. Cada endpoint debe mapear a un método del mapa de contratos de este documento cuando exista equivalente.
+
+---
+
+## Lista de endpoints por módulo
+
+### Módulo 0 — Perfil y búsqueda de usuarios
+
+1. **GET perfil propio**  
+   `GET /perfiles?id=eq.{uid}`  
+   Tras signup, el perfil lo crea el trigger `handle_new_user`.
+
+2. **PATCH perfil**  
+   `PATCH /perfiles?id=eq.{uid}`  
+   Body: `{ "nombre": string }`  
+   Solo el propio usuario.
+
+3. **GET buscar usuarios**  
+   `GET /perfiles?nombre=ilike.*{q}*&id=neq.{uid}&limit=20`  
+   Store: `useAmigosStore.buscarUsuarios`  
+   Para compartir e invitados. Ordenar amigos primero en el cliente (regla 6.4).
+
+---
+
+### Módulo 4 — Mesas de trabajo
+
+4. **LIST mesas**  
+   `GET /mesas_trabajo`  
+   Store: `fetchMesas`  
+   RLS: creador o invitado con menú aceptado.
+
+5. **CREATE mesa**  
+   `POST /mesas_trabajo`  
+   Body: `{ "nombre": string }` — `creador_id` = `auth.uid()`  
+   Store: `createMesa`  
+   Regla: 4.1
+
+6. **UPDATE mesa**  
+   `PATCH /mesas_trabajo?id=eq.{id}`  
+   Body: `{ "nombre": string }`  
+   Store: `updateMesa`  
+   Solo creador. Regla: 4.2
+
+7. **DELETE mesa**  
+   `DELETE /mesas_trabajo?id=eq.{id}`  
+   Store: `deleteMesa`  
+   Solo creador; cascade menús/listas. Regla: 4.3
+
+---
+
+### Módulo 5 — Menús
+
+8. **LIST menús por mesa**  
+   `GET /menus?mesa_trabajo_id=eq.{mesaId}&select=*,menu_platillos(platillo_id),menu_compartido(*)`  
+   Store: `fetchMenusByMesa`  
+   Regla: 5.4 (platillos del menú)
+
+9. **CREATE menú**  
+   `POST /menus`  
+   Body: `{ "mesa_trabajo_id": uuid, "nombre": string }`  
+   Store: `createMenu`  
+   Trigger crea lista automáticamente (regla 8.1). **No** endpoint de crear lista.
+
+10. **UPDATE menú**  
+    `PATCH /menus?id=eq.{id}`  
+    Body: `{ "nombre": string }`  
+    Store: `updateMenu`  
+    Dueño de mesa. Regla: 5.2
+
+11. **DELETE menú**  
+    `DELETE /menus?id=eq.{id}`  
+    Store: `deleteMenu`  
+    Cascade elimina lista (regla 8.2).
+
+12. **ADD platillo al menú**  
+    `POST /menu_platillos`  
+    Body: `{ "menu_id": uuid, "platillo_id": uuid }`  
+    Store: `addPlatilloToMenu`  
+    Trigger sync lista. No reimplementar sync en API.
+
+13. **REMOVE platillo del menú**  
+    `DELETE /menu_platillos?menu_id=eq.{menuId}&platillo_id=eq.{platilloId}`  
+    Store: `removePlatilloFromMenu`  
+    Trigger sync lista.
+
+14. **SHARE menú**  
+    `POST /menu_compartido`  
+    Body: `{ "menu_id": uuid, "usuario_invitado_id": uuid }`  
+    Store: `compartirMenu`  
+    Estado inicial `pendiente`. Trigger amistad (regla 6.3). Reglas: 5.5, 5.6
+
+15. **RESPONDER invitación menú**  
+    `PATCH /menu_compartido?menu_id=eq.{menuId}&usuario_invitado_id=eq.{uid}`  
+    Body: `{ "estado": "aceptado" }`  
+    Si deniega: `DELETE` de la fila (regla 5.6).  
+    Store: `responderInvitacionMenu`
+
+16. **REVOCAR acceso menú**  
+    `DELETE /menu_compartido?menu_id=eq.{menuId}&usuario_invitado_id=eq.{usuarioId}`  
+    Store: `revocarAccesoMenu`  
+    Solo dueño de mesa.
+
+17. **LIST invitaciones pendientes de menú**  
+    `GET /menu_compartido?usuario_invitado_id=eq.{uid}&estado=eq.pendiente&select=*,menus(*)`  
+    Bandeja de invitaciones (UI puede faltar en app; el endpoint debe existir).
+
+---
+
+### Módulo 6 — Amigos / Invitados a la mesa
+
+18. **LIST amigos**  
+    `GET /amigos?usuario_id=eq.{uid}&select=*,perfiles:amigo_id(id,nombre)`  
+    Store: `getAmigosIds`  
+    Relación mutua (regla 6.2).
+
+19. **ADD amigo**  
+    `POST /rpc/agregar_amigo`  
+    Body: `{ "p_amigo_id": uuid }`  
+    Store: `agregarAmigo`  
+    RPC `agregar_amigo` (definida en el esquema).
+
+20. **CHECK amistad**  
+    `GET /amigos?usuario_id=eq.{uid}&amigo_id=eq.{amigoId}`  
+    Store: `esAmigo`  
+    O derivado de LIST amigos.
+
+---
+
+### Módulo 7 — Platillos e ingredientes del platillo
+
+21. **GET catálogo tipos de comida**  
+    `GET /cat_tipos_comida`  
+    Solo lectura. Regla: 7.1.2
+
+22. **LIST platillos**  
+    `GET /platillos?select=*,platillo_tipos(tipo_comida_id),platillo_ingredientes(ingrediente_id,cantidad)`  
+    Store: `fetchPlatillos`  
+    Del usuario autenticado.
+
+23. **CREATE platillo**  
+    `POST /platillos` `{ "nombre": string }`  
+    Luego `POST /platillo_tipos` por cada tipo (multi-select).  
+    Store: `createPlatillo`  
+    Reglas: 7.1, 7.1.1
+
+24. **UPDATE platillo**  
+    `PATCH /platillos?id=eq.{id}` `{ "nombre": string }`  
+    Reemplazar filas en `platillo_tipos`.  
+    Store: `updatePlatillo`  
+    Regla: 7.2
+
+25. **DELETE platillo (simple)**  
+    `DELETE /platillos?id=eq.{id}`  
+    Store: `deletePlatillo`  
+    Solo quita el platillo y relaciones N:M; no borra ingredientes huérfanos.
+
+26. **RPC DELETE platillo selectivo**  
+    `POST /rpc/delete_platillo`  
+    Body: `{ "platillo_id": uuid, "ingrediente_ids_a_borrar": uuid[] }`  
+    Regla: 7.6 — preguntar cuáles ingredientes sin otros platillos borrar.
+
+27. **ADD ingrediente a platillo**  
+    `POST /platillo_ingredientes`  
+    Body: `{ "platillo_id": uuid, "ingrediente_id": uuid, "cantidad": string | null }`  
+    Store: `addIngredienteToPlatillo`  
+    Trigger sync listas. Regla: 7.5.1
+
+28. **UPDATE cantidad**  
+    `PATCH /platillo_ingredientes?platillo_id=eq.{pid}&ingrediente_id=eq.{iid}`  
+    Body: `{ "cantidad": string }`  
+    Store: `updateIngredienteCantidad`  
+    Regla: 7.5.3
+
+29. **REMOVE ingrediente de platillo**  
+    `DELETE /platillo_ingredientes?platillo_id=eq.{pid}&ingrediente_id=eq.{iid}`  
+    Store: `removeIngredienteFromPlatillo`  
+    Trigger sync listas. Regla: 7.5.2
+
+---
+
+### Módulo 7 global — Ingredientes (inventario)
+
+30. **LIST ingredientes**  
+    `GET /ingredientes`  
+    Store: `fetchIngredientes`
+
+31. **CREATE ingrediente**  
+    `POST /ingredientes`  
+    Body: `{ "nombre": string, "categoria"?: string, "stock"?: string }`  
+    Store: `createIngrediente`
+
+32. **UPDATE ingrediente**  
+    `PATCH /ingredientes?id=eq.{id}`  
+    Body: `{ "nombre", "categoria", "stock" }`  
+    Store: `updateIngrediente`
+
+33. **DELETE ingrediente**  
+    `DELETE /ingredientes?id=eq.{id}`  
+    Store: `deleteIngrediente`  
+    Cascade en `platillo_ingredientes`. Puede existir sin platillo (regla 7.6).
+
+34. **Vincular a platillo**  
+    Compuesto: CREATE ingrediente (opcional) + ADD a platillo (ítem 27).  
+    Flujo UI: elegir/crear ingrediente → vincular a un platillo con cantidad opcional.
+
+---
+
+### Módulo 8 — Listas de compras y lugares
+
+35. **GET lista por menú**  
+    `GET /listas_compras?menu_id=eq.{menuId}&select=*,lista_compra_items(*,lista_compra_item_platillos(platillo_id))`  
+    Store: `getListaByMenu`  
+    **No** hay CREATE manual de lista (regla 8.1).
+
+36. **RENAME lista**  
+    `PATCH /listas_compras?id=eq.{id}`  
+    Body: `{ "nombre": string }`  
+    Store: `renameLista`  
+    Regla: 8.3 — única mutación de la lista como entidad.
+
+37. **TOGGLE comprado**  
+    `PATCH /lista_compra_items?id=eq.{id}`  
+    Body: `{ "comprado": boolean }`  
+    Store: `toggleComprado`
+
+38. **MOVE a lugar de compra**  
+    `PATCH /lista_compra_items?id=eq.{id}`  
+    Body: `{ "lugar_compra_id": uuid | null }`  
+    Store: `moveToLugar`  
+    `null` = sección “sin lugar” (regla 8.7). Regla: 8.5
+
+39. **REORDER item**  
+    `PATCH /lista_compra_items?id=eq.{id}`  
+    Body: `{ "orden": number }`  
+    Para drag & drop futuro (regla 8.5).
+
+40. **ADD item suelto**  
+    `POST /lista_compra_items`  
+    Body: `{ "lista_compra_id": uuid, "ingrediente_id": uuid, "agregado_manualmente": true, "lugar_compra_id"?: uuid }`  
+    Store: `addItemManual`  
+    UNIQUE `(lista_compra_id, ingrediente_id)` — no duplicar (regla 8.10). Regla: 8.9
+
+41. **REMOVE item suelto**  
+    `DELETE /lista_compra_items?id=eq.{id}`  
+    Store: `removeItemManual`  
+    Preferible solo si `agregado_manualmente = true`.
+
+42. **RPC asignar item a platillo existente**  
+    `POST /rpc/assign_lista_item_platillo`  
+    Body: `{ "item_id": uuid, "platillo_id": uuid }`  
+    Store: `assignItemToPlatilloExistente`  
+    Upsert `platillo_ingredientes` + vínculo N:M en `lista_compra_item_platillos`. Reglas: 8.11, 8.12
+
+43. **RPC asignar item a platillo nuevo**  
+    `POST /rpc/assign_lista_item_platillo_nuevo`  
+    Body: `{ "item_id": uuid, "nombre": string, "tipos": string[] }`  
+    Store: `assignItemToPlatilloNuevo`  
+    Crea platillo + tipos + asigna. Regla: 8.12
+
+44. **CRUD lugares de compra**  
+    - `GET /lugares_compra`  
+    - `POST /lugares_compra` `{ "nombre": string }`  
+    - `PATCH /lugares_compra?id=eq.{id}` `{ "nombre": string }`  
+    - `DELETE /lugares_compra?id=eq.{id}`  
+    Store: `useLugaresCompraStore`  
+    Regla: 8.8 — por usuario.
+
+---
+
+### Módulo 9 — Encuestas
+
+45. **LIST encuestas**  
+    `GET /encuestas?select=*,encuesta_opciones(*),encuesta_compartida(*),encuesta_votos(*)`  
+    Store: `fetchEncuestas`  
+    Filtrar: creador o invitación `aceptada`.
+
+46. **CREATE encuesta**  
+    `POST /encuestas` `{ "titulo": string }`  
+    Luego opciones vía `POST /encuesta_opciones`.  
+    Si la opción es platillo nuevo: primero CREATE platillo (ítem 23).  
+    Store: `createEncuesta`  
+    Reglas: 9.1, 9.2
+
+47. **UPDATE título**  
+    `PATCH /encuestas?id=eq.{id}` `{ "titulo": string }`  
+    Store: `updateEncuesta`  
+    Solo creador. Regla: 9.4
+
+48. **DELETE encuesta**  
+    `DELETE /encuestas?id=eq.{id}`  
+    Store: `deleteEncuesta`  
+    Cascade. Regla: 9.4
+
+49. **ADD opción**  
+    `POST /encuesta_opciones`  
+    Body: `{ "encuesta_id": uuid, "platillo_id": uuid }`  
+    Store: `addOpcion`
+
+50. **REMOVE opción**  
+    `DELETE /encuesta_opciones?id=eq.{id}`  
+    Store: `removeOpcion`
+
+51. **RPC votar**  
+    `POST /rpc/votar_encuesta`  
+    Body: `{ "encuesta_id": uuid, "opcion_id": uuid }`  
+    Store: `votar`  
+    1 voto por usuario (`UNIQUE encuesta_id, usuario_id`). Mismo voto = retirar; otro = cambiar.
+
+52. **CERRAR encuesta**  
+    `PATCH /encuestas?id=eq.{id}`  
+    Body: `{ "estado": "cerrada", "fecha_cierre": timestamptz }`  
+    Store: `cerrarEncuesta`
+
+53. **SHARE encuesta**  
+    `POST /encuesta_compartida`  
+    Body: `{ "encuesta_id": uuid, "usuario_id": uuid }`  
+    Store: `compartirEncuesta`  
+    Estado `pendiente`. Trigger amistad (regla 6.3).
+
+54. **RESPONDER invitación encuesta**  
+    `PATCH /encuesta_compartida?encuesta_id=eq.{id}&usuario_id=eq.{uid}`  
+    Body: `{ "estado": "aceptada" }`  
+    Si rechaza: `DELETE` de la fila.  
+    Store: `responderInvitacion`
+
+55. **GET resultados / votos**  
+    `GET /encuesta_votos?encuesta_id=eq.{id}`  
+    Porcentajes se calculan en cliente o vista. Regla: 9.3
+
+---
+
+## RPC a implementar en Postgres
+
+Además de las ya definidas en el esquema (`agregar_amigo`, helpers de listas, `handle_new_user` — ver `Docs/base.sql`):
+
+### 1. `delete_platillo(p_platillo_id uuid, p_ingrediente_ids_a_borrar uuid[])`
+
+- Elimina el platillo.
+- Para cada id en `p_ingrediente_ids_a_borrar`: si el ingrediente no queda ligado a otro platillo, eliminarlo.
+- SECURITY DEFINER + validar `creador_id = auth.uid()`.
+
+### 2. `assign_lista_item_platillo(p_item_id uuid, p_platillo_id uuid)`
+
+- Lee `ingrediente_id` del item.
+- Upsert en `platillo_ingredientes`.
+- Insert en `lista_compra_item_platillos`.
+- Validar acceso a la lista del menú y ownership del platillo.
+
+### 3. `assign_lista_item_platillo_nuevo(p_item_id uuid, p_nombre text, p_tipos text[])`
+
+- Crea platillo + filas en `platillo_tipos` (resolver ids desde `cat_tipos_comida`).
+- Llama la lógica de `assign_lista_item_platillo`.
+
+### 4. `votar_encuesta(p_encuesta_id uuid, p_opcion_id uuid)`
+
+- Si ya existe voto del usuario a esa misma opción → DELETE (toggle).
+- Si existe voto a otra opción → UPDATE.
+- Si no existe → INSERT.
+- Validar acceso a encuesta (`aceptada` o creador) y encuesta `activa`.
+
+---
+
+## Checklist del implementador
+
+- [ ] Cada endpoint mapea a un método del mapa de contratos de este documento (o a regla de fundations)
+- [ ] Reglas 8.10 UNIQUE y N:M respetadas en RPC compuestos
+- [ ] No duplicar lógica de triggers en la API
+- [ ] Documentar queries `select` anidados para móvil
+- [ ] Auth solo en cliente (SDK); datos con JWT
+- [ ] Probar con 2 usuarios: compartir menú, aceptar, votar encuesta, sync de lista
+- [ ] Amigos primero al compartir se ordena en cliente (6.4)
+
+---
+
+## Mapa dominio → endpoints (resumen)
+
+| Dominio | Endpoints principales |
+|---------|----------------------|
+| Auth (cliente SDK) | Fuera de alcance |
+| Mesas | 4–7 |
+| Menús | 8–17 |
+| Amigos | 3, 18–20 |
+| Platillos | 21–29 |
+| Ingredientes | 30–34 |
+| Listas de compras | 35–43 |
+| Lugares de compra | 44 |
+| Encuestas | 45–55 |
+
+---
+
+## Contratos de métodos (equivalente a stores mock)
+
+### Mesas — endpoints 4–7
+- `fetchMesas()` → LIST
+- `createMesa(nombre)` → CREATE
+- `updateMesa(id, nombre)` → UPDATE
+- `deleteMesa(id)` → DELETE
+
+### Menús — 8–17
+- `fetchMenusByMesa(mesaId)`, `createMenu(mesaId, nombre)`, `updateMenu`, `deleteMenu`
+- `addPlatilloToMenu` / `removePlatilloFromMenu`
+- `compartirMenu`, `responderInvitacionMenu(aceptado|denegado)`, `revocarAccesoMenu`
+
+### Amigos — 3, 18–20
+- `buscarUsuarios(query)`, `getAmigosIds`, `agregarAmigo`, `esAmigo`
+
+### Platillos — 21–29
+- `fetch` / `create` / `update` / `deletePlatillo`
+- `add` / `remove` / `updateIngredienteCantidad` en platillo
+- delete selectivo → RPC `delete_platillo` (regla 7.6)
+
+### Ingredientes — 30–34
+- `fetch` / `create` / `update` / `deleteIngrediente`
+- Vincular = create opcional + add a platillo
+
+### Listas — 35–43
+- `getListaByMenu`, `renameLista`, `toggleComprado`, `moveToLugar`, `add` / `removeItemManual`
+- `assignItemToPlatilloExistente` / `Nuevo` → RPC
+
+### Lugares — 44
+- `fetch` / `create` / `update` / `deleteLugar`
+
+### Encuestas — 45–55
+- `fetch` / `create` / `update` / `deleteEncuesta`, `add` / `removeOpcion`
+- `votar` → RPC, `cerrarEncuesta`, `compartir`, `responderInvitacion`
+
+---
+
+## Referencias externas
+
+- `Docs/fundations-prompt` — requisitos módulos 1–9
+- `Docs/base.sql` — tablas, RLS, triggers, RPC base
+
+Todo lo demás (migraciones, contratos de app, flujos UI) está resumido en este documento.
