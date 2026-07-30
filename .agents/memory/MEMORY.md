@@ -1,0 +1,1 @@
+- [Gallo FastAPI architecture](gallo-fastapi-arch.md) — PostgREST proxy pattern via httpx; no asyncpg/direct DB; SUPABASE_DB_URL not needed.
