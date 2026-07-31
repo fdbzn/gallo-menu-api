@@ -1,7 +1,7 @@
 """Módulo 7 — Platillos e ingredientes del platillo."""
 from typing import List, Optional
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app.config import settings
@@ -9,6 +9,12 @@ from app.database import db
 from app.deps import get_current_user
 
 router = APIRouter(tags=["platillos"])
+
+
+def _as_postgrest_filter(value: str) -> str:
+    if value.startswith(("eq.", "in.", "neq.", "gt.", "gte.", "lt.", "lte.", "like.", "ilike.")):
+        return value
+    return f"eq.{value}"
 
 
 class CreatePlatilloBody(BaseModel):
@@ -46,15 +52,32 @@ async def list_tipos_comida(user: dict = Depends(get_current_user)):
 # ── Platillos ─────────────────────────────────────────────────────────────────
 
 @router.get("/platillos")
-async def list_platillos(user: dict = Depends(get_current_user)):
-    return await db(user["_token"]).select(
-        "platillos",
-        {
-            "creador_id": f"eq.{user['sub']}",
-            "select": "*,platillo_tipos(tipo_comida_id),platillo_ingredientes(ingrediente_id,cantidad)",
-            "order": "nombre.asc",
-        },
-    )
+async def list_platillos(
+    user: dict = Depends(get_current_user),
+    id: Optional[str] = Query(
+        None,
+        description="PostgREST id filter, e.g. in.(uuid1,uuid2) for shared-menu resolution",
+    ),
+):
+    """
+    Catálogo = solo propios.
+
+    RLS también permite leer platillos de menús/encuestas compartidos; eso sigue
+    válido vía `id=in.(...)`, pero el listado por defecto no los mezcla en el
+    inventario del usuario.
+    """
+    params: dict[str, str] = {
+        "select": (
+            "*,platillo_tipos(tipo_comida_id),"
+            "platillo_ingredientes(ingrediente_id,cantidad,ingredientes(id,nombre))"
+        ),
+        "order": "nombre.asc",
+    }
+    if id:
+        params["id"] = _as_postgrest_filter(id)
+    else:
+        params["creador_id"] = f"eq.{user['sub']}"
+    return await db(user["_token"]).select("platillos", params)
 
 
 @router.post("/platillos", status_code=201)

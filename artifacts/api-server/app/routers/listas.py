@@ -54,7 +54,7 @@ async def get_lista_by_menu(menu_id: str, user: dict = Depends(get_current_user)
         "listas_compras",
         {
             "menu_id": f"eq.{menu_id}",
-            "select": "*,lista_compra_items(*,lista_compra_item_platillos(platillo_id))",
+            "select": "*,lista_compra_items(*,lista_compra_item_platillos(platillo_id,platillos(nombre)),ingredientes(nombre),lugares_compra(nombre))",
         },
     )
     if not rows:

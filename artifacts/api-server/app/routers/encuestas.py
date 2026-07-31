@@ -45,7 +45,7 @@ async def list_encuestas(user: dict = Depends(get_current_user)):
     return await db(user["_token"]).select(
         "encuestas",
         {
-            "select": "*,encuesta_opciones(*),encuesta_compartida(*),encuesta_votos(*)",
+            "select": "*,encuesta_opciones(*,platillos(nombre)),encuesta_compartida(*),encuesta_votos(*)",
             "order": "created_at.desc",
         },
     )

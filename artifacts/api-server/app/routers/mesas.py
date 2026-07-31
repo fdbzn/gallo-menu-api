@@ -14,7 +14,14 @@ class MesaBody(BaseModel):
 
 @router.get("")
 async def list_mesas(user: dict = Depends(get_current_user)):
-    return await db(user["_token"]).select("mesas_trabajo", {"order": "created_at.desc"})
+    # Nest creator profile so invitees see "Por {nombre}" instead of "Por Usuario"
+    return await db(user["_token"]).select(
+        "mesas_trabajo",
+        {
+            "select": "*,perfiles:creador_id(id,nombre)",
+            "order": "created_at.desc",
+        },
+    )
 
 
 @router.post("", status_code=201)

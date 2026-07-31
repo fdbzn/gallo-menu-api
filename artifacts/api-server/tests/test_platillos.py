@@ -26,6 +26,21 @@ class TestListPlatillos:
         resp = await client.get("/platillos", headers=auth_headers)
         assert resp.status_code == 200
         assert resp.json()[0]["nombre"] == "Tacos"
+        args, _kwargs = mock_db.select.call_args
+        assert args[0] == "platillos"
+        assert args[1]["creador_id"].startswith("eq.")
+
+    async def test_list_by_ids_skips_creador_filter(self, client, auth_headers, mock_db):
+        mock_db.select.return_value = [{"id": "p9", "nombre": "Ajeno"}]
+        resp = await client.get(
+            "/platillos",
+            headers=auth_headers,
+            params={"id": "in.(p9,p8)"},
+        )
+        assert resp.status_code == 200
+        args, _kwargs = mock_db.select.call_args
+        assert args[1]["id"] == "in.(p9,p8)"
+        assert "creador_id" not in args[1]
 
 
 class TestCreatePlatillo:

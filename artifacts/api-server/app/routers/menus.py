@@ -40,7 +40,7 @@ async def list_menus_by_mesa(mesa_trabajo_id: str, user: dict = Depends(get_curr
         "menus",
         {
             "mesa_trabajo_id": f"eq.{mesa_trabajo_id}",
-            "select": "*,menu_platillos(platillo_id),menu_compartido(*)",
+            "select": "*,menu_platillos(platillo_id,platillos(nombre)),menu_compartido(*)",
             "order": "created_at.desc",
         },
     )
@@ -158,12 +158,6 @@ async def revocar_acceso_menu(
 
 @router.get("/menu_compartido/pendientes")
 async def list_pending_menu_invitations(user: dict = Depends(get_current_user)):
-    return await db(user["_token"]).select(
-        "menu_compartido",
-        {
-            "usuario_invitado_id": f"eq.{user['sub']}",
-            "estado": "eq.pendiente",
-            "select": "*,menus(*)",
-            "order": "created_at.desc",
-        },
-    )
+    # SECURITY DEFINER RPC: includes menu/mesa/sharer preview while still pendiente
+    return await db(user["_token"]).rpc("list_pending_menu_invitations", {})
+

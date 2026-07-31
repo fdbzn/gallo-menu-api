@@ -1,6 +1,7 @@
 """Módulo 7 global — Ingredientes (inventario)."""
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app.database import db
@@ -21,12 +22,33 @@ class UpdateIngredienteBody(BaseModel):
     stock: Optional[str] = None
 
 
+def _as_postgrest_filter(value: str) -> str:
+    if value.startswith(("eq.", "in.", "neq.", "gt.", "gte.", "lt.", "lte.", "like.", "ilike.")):
+        return value
+    return f"eq.{value}"
+
+
 @router.get("")
-async def list_ingredientes(user: dict = Depends(get_current_user)):
-    return await db(user["_token"]).select(
-        "ingredientes",
-        {"creador_id": f"eq.{user['sub']}", "order": "nombre.asc"},
-    )
+async def list_ingredientes(
+    user: dict = Depends(get_current_user),
+    id: Optional[str] = Query(
+        None,
+        description="PostgREST id filter, e.g. in.(uuid1,uuid2) for shared-menu resolution",
+    ),
+):
+    """
+    Catálogo de inventario = solo propios.
+
+    RLS también permite leer ingredientes de menús compartidos; eso sigue
+    válido vía `id=in.(...)` (detalle de platillo / lista), pero el listado
+    por defecto no debe mezclarlos en el inventario del usuario.
+    """
+    params: dict[str, str] = {"order": "nombre.asc"}
+    if id:
+        params["id"] = _as_postgrest_filter(id)
+    else:
+        params["creador_id"] = f"eq.{user['sub']}"
+    return await db(user["_token"]).select("ingredientes", params)
 
 
 @router.post("", status_code=201)

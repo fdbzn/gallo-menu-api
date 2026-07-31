@@ -17,6 +17,8 @@ class TestListMesas:
         resp = await client.get("/mesas_trabajo", headers=auth_headers)
         assert resp.status_code == 200
         assert len(resp.json()) == 2
+        args, _kwargs = mock_db.select.call_args
+        assert "perfiles:creador_id" in args[1]["select"]
 
     async def test_unauthorized_without_token(self, client):
         resp = await client.get("/mesas_trabajo")

@@ -14,9 +14,10 @@ class LugarBody(BaseModel):
 
 @router.get("")
 async def list_lugares(user: dict = Depends(get_current_user)):
+    # RLS returns own + lugares referenced by accepted shared shopping lists
     return await db(user["_token"]).select(
         "lugares_compra",
-        {"creador_id": f"eq.{user['sub']}", "order": "nombre.asc"},
+        {"order": "nombre.asc"},
     )
 
 
