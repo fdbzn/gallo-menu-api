@@ -49,8 +49,27 @@ async def list_menus_by_mesa(mesa_trabajo_id: str, user: dict = Depends(get_curr
 @router.post("/menus", status_code=201)
 async def create_menu(body: CreateMenuBody, user: dict = Depends(get_current_user)):
     """Trigger crea lista de compras automáticamente (regla 8.1)."""
-    return await db(user["_token"]).insert(
-        "menus", {"mesa_trabajo_id": body.mesa_trabajo_id, "nombre": body.nombre}
+    client = db(user["_token"])
+    row = await client.insert(
+        "menus",
+        {"mesa_trabajo_id": body.mesa_trabajo_id, "nombre": body.nombre},
+    )
+    if row.get("id"):
+        return row
+    rows = await client.select(
+        "menus",
+        {
+            "mesa_trabajo_id": f"eq.{body.mesa_trabajo_id}",
+            "nombre": f"eq.{body.nombre}",
+            "order": "created_at.desc",
+            "limit": "1",
+        },
+    )
+    if rows:
+        return rows[0]
+    raise HTTPException(
+        status_code=403,
+        detail="No tienes permiso para crear menús en esta mesa (solo el creador de la mesa).",
     )
 
 

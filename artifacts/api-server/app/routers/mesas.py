@@ -36,7 +36,7 @@ async def create_mesa(body: MesaBody, user: dict = Depends(get_current_user)):
     )
     if rows:
         return rows[0]
-    raise HTTPException(status_code=500, detail="No se pudo crear la mesa")
+    raise HTTPException(status_code=403, detail="No se pudo crear la mesa")
 
 
 @router.patch("/{mesa_id}")

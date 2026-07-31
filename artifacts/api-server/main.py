@@ -1,7 +1,9 @@
 """Gallo — FastAPI backend service."""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
+from app.database import PostgRESTError
 from app.routers import (
     perfiles,
     mesas,
@@ -39,6 +41,11 @@ app.include_router(ingredientes.router)
 app.include_router(listas.router)
 app.include_router(lugares.router)
 app.include_router(encuestas.router)
+
+
+@app.exception_handler(PostgRESTError)
+async def postgrest_error_handler(_request, exc: PostgRESTError):
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
 @app.get("/healthz", tags=["health"])

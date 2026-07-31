@@ -5,11 +5,17 @@ Supabase Row-Level Security policies are applied exactly as they would be
 from the mobile client.
 """
 from contextlib import asynccontextmanager
+import httpx
 from typing import Any, Optional
 
-import httpx
-
 from app.config import settings
+
+
+class PostgRESTError(Exception):
+    def __init__(self, status_code: int, detail: Any) -> None:
+        self.status_code = status_code
+        self.detail = detail
+        super().__init__(str(detail))
 
 
 class PostgREST:
@@ -45,7 +51,14 @@ class PostgREST:
             )
         if resp.status_code == 404 or resp.status_code == 406:
             return None
-        resp.raise_for_status()
+        if not resp.is_success:
+            detail: Any = resp.text
+            if resp.content:
+                try:
+                    detail = resp.json()
+                except Exception:
+                    pass
+            raise PostgRESTError(resp.status_code, detail)
         if resp.content:
             return resp.json()
         return None
@@ -63,7 +76,20 @@ class PostgREST:
         return rows[0] if rows else None
 
     async def insert(self, table: str, data: dict) -> dict:
-        result = await self._req("POST", f"/{table}", json=data)
+        try:
+            result = await self._req("POST", f"/{table}", json=data)
+        except PostgRESTError as exc:
+            if exc.status_code != 403:
+                raise
+            # PostgREST rolls back INSERT when return=representation is blocked by
+            # SELECT RLS. Retry with return=minimal so the row is committed.
+            await self._req(
+                "POST",
+                f"/{table}",
+                json=data,
+                prefer="return=minimal",
+            )
+            return {}
         if isinstance(result, list):
             return result[0] if result else {}
         return result or {}
@@ -78,7 +104,20 @@ class PostgREST:
 
     async def update(self, table: str, filters: dict, data: dict) -> dict | None:
         params = {k: f"eq.{v}" for k, v in filters.items()}
-        result = await self._req("PATCH", f"/{table}", params=params, json=data)
+        try:
+            result = await self._req("PATCH", f"/{table}", params=params, json=data)
+        except PostgRESTError as exc:
+            if exc.status_code != 403:
+                raise
+            await self._req(
+                "PATCH",
+                f"/{table}",
+                params=params,
+                json=data,
+                prefer="return=minimal",
+            )
+            rows = await self.select(table, {**params, "limit": "1"})
+            return rows[0] if rows else None
         if isinstance(result, list):
             return result[0] if result else None
         return result
