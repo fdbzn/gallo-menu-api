@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+*.egg
+
+# Environment & secrets
+.env
+.env.*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Graphify — generated artifacts
+graphify-out/
+
+# Agent memory
+.agents/
+
+# Local / Replit
+.local/
+.cache/
+
+# Reference docs (not runtime)
+attached_assets/
+replit.md
+
+# Testing
+tests/
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Docker
+Dockerfile
+.dockerignore

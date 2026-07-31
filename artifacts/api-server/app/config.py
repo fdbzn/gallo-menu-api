@@ -1,7 +1,13 @@
-"""Application settings loaded from environment variables."""
+"""Application settings loaded from environment variables.
+
+Priority: OS env vars > .env file (optional, local dev only).
+Cloud Run provides vars directly — no .env file needed.
+"""
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
 
 
 class Settings(BaseSettings):
@@ -10,9 +16,9 @@ class Settings(BaseSettings):
     supabase_jwt_secret: str
 
     model_config = SettingsConfigDict(
-        env_file=Path(__file__).resolve().parents[3] / ".env",
+        env_file=_ENV_FILE if _ENV_FILE.is_file() else None,
         extra="ignore",
     )
 
 
-settings = Settings()  # pyright: ignore[reportCallIssue]  -- values come from env vars
+settings = Settings()
