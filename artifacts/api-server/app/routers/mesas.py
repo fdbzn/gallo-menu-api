@@ -19,9 +19,24 @@ async def list_mesas(user: dict = Depends(get_current_user)):
 
 @router.post("", status_code=201)
 async def create_mesa(body: MesaBody, user: dict = Depends(get_current_user)):
-    return await db(user["_token"]).insert(
+    client = db(user["_token"])
+    row = await client.insert(
         "mesas_trabajo", {"creador_id": user["sub"], "nombre": body.nombre}
     )
+    if row.get("id"):
+        return row
+    rows = await client.select(
+        "mesas_trabajo",
+        {
+            "creador_id": f"eq.{user['sub']}",
+            "nombre": f"eq.{body.nombre}",
+            "order": "created_at.desc",
+            "limit": "1",
+        },
+    )
+    if rows:
+        return rows[0]
+    raise HTTPException(status_code=500, detail="No se pudo crear la mesa")
 
 
 @router.patch("/{mesa_id}")

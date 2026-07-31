@@ -64,7 +64,9 @@ class PostgREST:
 
     async def insert(self, table: str, data: dict) -> dict:
         result = await self._req("POST", f"/{table}", json=data)
-        return (result[0] if isinstance(result, list) else result) or {}
+        if isinstance(result, list):
+            return result[0] if result else {}
+        return result or {}
 
     async def upsert(self, table: str, data: dict, on_conflict: str = "") -> dict | None:
         prefer = f"return=representation,resolution=merge-duplicates"
