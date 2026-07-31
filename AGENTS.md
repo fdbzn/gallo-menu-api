@@ -73,7 +73,7 @@ Si tienes conexión con el **MCP de Obsidian** (`obsidianprojects`), consulta el
 
 - `artifacts/api-server/main.py` — app FastAPI y lifespan (pool init/close)
 - `artifacts/api-server/app/database.py` — pool asyncpg + contexto RLS por request
-- `artifacts/api-server/app/auth.py` — validación JWT con SUPABASE_JWT_SECRET
+- `artifacts/api-server/app/auth.py` — validación JWT: JWKS (ES256) + HS256 legacy
 - `artifacts/api-server/app/deps.py` — dependencia `get_current_user`
 - `artifacts/api-server/app/routers/` — 9 routers por módulo de negocio
 
@@ -102,7 +102,7 @@ Si tienes conexión con el **MCP de Obsidian** (`obsidianprojects`), consulta el
 
 - `SUPABASE_URL` — URL del proyecto Supabase
 - `SUPABASE_ANON_KEY` — clave anon/public
-- `SUPABASE_JWT_SECRET` — JWT secret para validar tokens
+- `SUPABASE_JWT_SECRET` — secret HS256 legacy / tests (tokens reales ES256 usan JWKS)
 - `SUPABASE_DB_URL` — connection string PostgreSQL directo
 
 ## User preferences
