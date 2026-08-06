@@ -63,6 +63,18 @@ class TestCreatePlatillo:
         )
         assert resp.status_code == 201
 
+    async def test_creates_when_insert_returns_empty_rls_fallback(
+        self, client, auth_headers, mock_db
+    ):
+        mock_db.insert.return_value = {}
+        mock_db.select.return_value = [{"id": "new", "nombre": "Pizza", "creador_id": "u1"}]
+        resp = await client.post(
+            "/platillos", headers=auth_headers, json={"nombre": "Pizza", "tipos": [2]}
+        )
+        assert resp.status_code == 201
+        assert resp.json()["id"] == "new"
+        assert mock_db.insert.call_count == 2
+
 
 class TestUpdatePlatillo:
     async def test_updates_nombre_and_tipos(self, client, auth_headers, mock_db):

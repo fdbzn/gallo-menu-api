@@ -34,6 +34,7 @@ app.add_middleware(
 # ── Routers ──────────────────────────────────────────────────────────────────
 app.include_router(perfiles.router)
 app.include_router(mesas.router)
+app.include_router(mesas.compartir_router)
 app.include_router(menus.router)
 app.include_router(amigos.router)
 app.include_router(platillos.router)

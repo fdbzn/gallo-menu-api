@@ -89,14 +89,15 @@ Si tienes conexión con el **MCP de Obsidian** (`obsidianprojects`), consulta el
 | # | Módulo | Endpoints |
 |---|--------|-----------|
 | 0 | Perfiles y búsqueda | GET /perfiles/me, PATCH /perfiles/me, GET /perfiles/buscar |
-| 4 | Mesas de trabajo | CRUD /mesas_trabajo |
-| 5 | Menús y compartición | CRUD /menus, /menu_platillos, /menu_compartido |
+| 4 | Mesas de trabajo | CRUD /mesas_trabajo; compartición /mesa_compartida (+ pendientes RPC) |
+| 5 | Menús y compartición | CRUD /menus, /menu_platillos, /menu_compartido (`tipo_cuenta_id`) |
 | 6 | Amigos | GET/POST /amigos, /amigos/agregar |
-| 7 | Platillos e ingredientes | CRUD /platillos, /platillo_ingredientes, /cat_tipos_comida |
+| 7 | Platillos e ingredientes | CRUD /platillos, /platillo_ingredientes, /cat_tipos_comida; /platillo_compartido |
 | 7g | Ingredientes globales | CRUD /ingredientes |
 | 8 | Listas de compras | GET/PATCH /listas_compras, /lista_compra_items, RPCs assign |
 | 8 | Lugares de compra | CRUD /lugares_compra |
-| 9 | Encuestas | CRUD /encuestas, /encuesta_opciones, /encuesta_votos, RPC votar |
+| 9 | Encuestas | CRUD /encuestas, /encuesta_opciones, /encuesta_votos, RPC votar; /encuesta_compartida (`tipo_cuenta_id`) |
+| 10 | Permisos | POST share bodies incluyen `tipo_cuenta_id` (editor\|solo_ver); pendientes vía RPCs |
 
 ## Required secrets
 

@@ -26,10 +26,27 @@ class MenuPlatilloBody(BaseModel):
 class CompartirMenuBody(BaseModel):
     menu_id: str
     usuario_invitado_id: str
+    tipo_cuenta_id: Optional[int] = None  # editor | solo_ver; default solo_ver
 
 
 class ResponderMenuBody(BaseModel):
     estado: str  # "aceptado" | "denegado"
+
+
+class CambiarRolMenuBody(BaseModel):
+    tipo_cuenta_id: Optional[int] = None  # editor | solo_ver
+
+
+async def _resolve_tipo_cuenta_id(token: str, tipo_cuenta_id: Optional[int]) -> int:
+    if tipo_cuenta_id is not None:
+        return tipo_cuenta_id
+    rows = await db(token).select(
+        "cat_tipos_cuenta",
+        {"codigo": "eq.solo_ver", "select": "id", "limit": "1"},
+    )
+    if rows:
+        return rows[0]["id"]
+    return 3  # seed order: propietario=1, editor=2, solo_ver=3
 
 
 # ── Menús ─────────────────────────────────────────────────────────────────────
@@ -40,7 +57,7 @@ async def list_menus_by_mesa(mesa_trabajo_id: str, user: dict = Depends(get_curr
         "menus",
         {
             "mesa_trabajo_id": f"eq.{mesa_trabajo_id}",
-            "select": "*,menu_platillos(platillo_id,platillos(nombre)),menu_compartido(*)",
+            "select": "*,menu_platillos(platillo_id,platillos(nombre)),menu_compartido(*,cat_tipos_cuenta(id,codigo,nombre))",
             "order": "created_at.desc",
         },
     )
@@ -122,9 +139,14 @@ async def remove_platillo_from_menu(
 @router.post("/menu_compartido", status_code=201)
 async def compartir_menu(body: CompartirMenuBody, user: dict = Depends(get_current_user)):
     """Estado inicial pendiente; trigger crea amistad automáticamente (regla 6.3)."""
+    tipo_cuenta_id = await _resolve_tipo_cuenta_id(user["_token"], body.tipo_cuenta_id)
     return await db(user["_token"]).insert(
         "menu_compartido",
-        {"menu_id": body.menu_id, "usuario_invitado_id": body.usuario_invitado_id},
+        {
+            "menu_id": body.menu_id,
+            "usuario_invitado_id": body.usuario_invitado_id,
+            "tipo_cuenta_id": tipo_cuenta_id,
+        },
     )
 
 
@@ -141,6 +163,25 @@ async def responder_invitacion_menu(
         "menu_compartido",
         {"menu_id": menu_id, "usuario_invitado_id": user["sub"]},
         {"estado": body.estado},
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Invitación no encontrada")
+    return row
+
+
+@router.patch("/menu_compartido/{menu_id}/usuario/{usuario_id}/rol")
+async def cambiar_rol_menu(
+    menu_id: str,
+    usuario_id: str,
+    body: CambiarRolMenuBody,
+    user: dict = Depends(get_current_user),
+):
+    """Propietario (invite_manage): editor ↔ solo_ver. No asigna propietario."""
+    tipo_cuenta_id = await _resolve_tipo_cuenta_id(user["_token"], body.tipo_cuenta_id)
+    row = await db(user["_token"]).update(
+        "menu_compartido",
+        {"menu_id": menu_id, "usuario_invitado_id": usuario_id},
+        {"tipo_cuenta_id": tipo_cuenta_id},
     )
     if not row:
         raise HTTPException(status_code=404, detail="Invitación no encontrada")

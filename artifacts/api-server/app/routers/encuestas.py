@@ -32,10 +32,27 @@ class VotarBody(BaseModel):
 class CompartirEncuestaBody(BaseModel):
     encuesta_id: str
     usuario_id: str
+    tipo_cuenta_id: Optional[int] = None  # editor | solo_ver; default solo_ver
 
 
 class ResponderEncuestaBody(BaseModel):
     estado: str  # "aceptada" | "rechazada"
+
+
+class CambiarRolEncuestaBody(BaseModel):
+    tipo_cuenta_id: Optional[int] = None  # editor | solo_ver
+
+
+async def _resolve_tipo_cuenta_id(token: str, tipo_cuenta_id: Optional[int]) -> int:
+    if tipo_cuenta_id is not None:
+        return tipo_cuenta_id
+    rows = await db(token).select(
+        "cat_tipos_cuenta",
+        {"codigo": "eq.solo_ver", "select": "id", "limit": "1"},
+    )
+    if rows:
+        return rows[0]["id"]
+    return 3
 
 
 # ── Encuestas ─────────────────────────────────────────────────────────────────
@@ -45,7 +62,7 @@ async def list_encuestas(user: dict = Depends(get_current_user)):
     return await db(user["_token"]).select(
         "encuestas",
         {
-            "select": "*,encuesta_opciones(*,platillos(nombre)),encuesta_compartida(*),encuesta_votos(*)",
+            "select": "*,encuesta_opciones(*,platillos(nombre)),encuesta_compartida(*,cat_tipos_cuenta(id,codigo,nombre)),encuesta_votos(*)",
             "order": "created_at.desc",
         },
     )
@@ -116,8 +133,14 @@ async def compartir_encuesta(
     body: CompartirEncuestaBody, user: dict = Depends(get_current_user)
 ):
     """Trigger crea amistad automáticamente (regla 6.3)."""
+    tipo_cuenta_id = await _resolve_tipo_cuenta_id(user["_token"], body.tipo_cuenta_id)
     return await db(user["_token"]).insert(
-        "encuesta_compartida", {"encuesta_id": body.encuesta_id, "usuario_id": body.usuario_id}
+        "encuesta_compartida",
+        {
+            "encuesta_id": body.encuesta_id,
+            "usuario_id": body.usuario_id,
+            "tipo_cuenta_id": tipo_cuenta_id,
+        },
     )
 
 
@@ -140,14 +163,37 @@ async def responder_invitacion_encuesta(
     return row
 
 
+@router.patch("/encuesta_compartida/{encuesta_id}/usuario/{usuario_id}/rol")
+async def cambiar_rol_encuesta(
+    encuesta_id: str,
+    usuario_id: str,
+    body: CambiarRolEncuestaBody,
+    user: dict = Depends(get_current_user),
+):
+    """Propietario (invite_manage): editor ↔ solo_ver. No asigna propietario."""
+    tipo_cuenta_id = await _resolve_tipo_cuenta_id(user["_token"], body.tipo_cuenta_id)
+    row = await db(user["_token"]).update(
+        "encuesta_compartida",
+        {"encuesta_id": encuesta_id, "usuario_id": usuario_id},
+        {"tipo_cuenta_id": tipo_cuenta_id},
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Invitación no encontrada")
+    return row
+
+
+@router.delete(
+    "/encuesta_compartida/{encuesta_id}/usuario/{usuario_id}", status_code=204
+)
+async def revocar_acceso_encuesta(
+    encuesta_id: str, usuario_id: str, user: dict = Depends(get_current_user)
+):
+    await db(user["_token"]).delete(
+        "encuesta_compartida",
+        {"encuesta_id": encuesta_id, "usuario_id": usuario_id},
+    )
+
+
 @router.get("/encuesta_compartida/pendientes")
 async def list_pending_encuesta_invitations(user: dict = Depends(get_current_user)):
-    return await db(user["_token"]).select(
-        "encuesta_compartida",
-        {
-            "usuario_id": f"eq.{user['sub']}",
-            "estado": "eq.pendiente",
-            "select": "*,encuestas(titulo,estado)",
-            "order": "created_at.desc",
-        },
-    )
+    return await db(user["_token"]).rpc("list_pending_encuesta_invitations", {})
