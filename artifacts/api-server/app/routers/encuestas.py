@@ -1,6 +1,6 @@
 """Módulo 9 — Encuestas."""
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app.database import db
@@ -11,6 +11,7 @@ router = APIRouter(tags=["encuestas"])
 
 class CreateEncuestaBody(BaseModel):
     titulo: str
+    mesa_id: str
 
 
 class UpdateEncuestaBody(BaseModel):
@@ -58,10 +59,16 @@ async def _resolve_tipo_cuenta_id(token: str, tipo_cuenta_id: Optional[int]) -> 
 # ── Encuestas ─────────────────────────────────────────────────────────────────
 
 @router.get("/encuestas")
-async def list_encuestas(user: dict = Depends(get_current_user)):
+async def list_encuestas(
+    user: dict = Depends(get_current_user),
+    mesa_id: Optional[str] = Query(None, description="Filtra por mesa"),
+):
+    if not mesa_id:
+        raise HTTPException(status_code=400, detail="mesa_id es requerido")
     return await db(user["_token"]).select(
         "encuestas",
         {
+            "mesa_id": f"eq.{mesa_id}",
             "select": "*,encuesta_opciones(*,platillos(nombre)),encuesta_compartida(*,cat_tipos_cuenta(id,codigo,nombre)),encuesta_votos(*)",
             "order": "created_at.desc",
         },
@@ -71,7 +78,8 @@ async def list_encuestas(user: dict = Depends(get_current_user)):
 @router.post("/encuestas", status_code=201)
 async def create_encuesta(body: CreateEncuestaBody, user: dict = Depends(get_current_user)):
     return await db(user["_token"]).insert(
-        "encuestas", {"creador_id": user["sub"], "titulo": body.titulo}
+        "encuestas",
+        {"creador_id": user["sub"], "titulo": body.titulo, "mesa_id": body.mesa_id},
     )
 
 

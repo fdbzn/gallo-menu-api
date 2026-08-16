@@ -1,4 +1,4 @@
-"""Módulo 5 — Menús y compartición."""
+from datetime import date
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -11,16 +11,22 @@ router = APIRouter(tags=["menus"])
 
 class MenuBody(BaseModel):
     nombre: str
+    fecha_inicio: Optional[date] = None
+    fecha_fin: Optional[date] = None
 
 
 class CreateMenuBody(BaseModel):
     mesa_trabajo_id: str
     nombre: str
+    fecha_inicio: Optional[date] = None
+    fecha_fin: Optional[date] = None
 
 
 class MenuPlatilloBody(BaseModel):
     menu_id: str
     platillo_id: str
+    fecha: Optional[date] = None
+    segmento_id: Optional[str] = None
 
 
 class CompartirMenuBody(BaseModel):
@@ -57,7 +63,7 @@ async def list_menus_by_mesa(mesa_trabajo_id: str, user: dict = Depends(get_curr
         "menus",
         {
             "mesa_trabajo_id": f"eq.{mesa_trabajo_id}",
-            "select": "*,menu_platillos(platillo_id,platillos(nombre)),menu_compartido(*,cat_tipos_cuenta(id,codigo,nombre))",
+            "select": "*,menu_platillos(id,platillo_id,fecha,segmento_id,platillos(nombre)),menu_compartido(*,cat_tipos_cuenta(id,codigo,nombre))",
             "order": "created_at.desc",
         },
     )
@@ -67,10 +73,13 @@ async def list_menus_by_mesa(mesa_trabajo_id: str, user: dict = Depends(get_curr
 async def create_menu(body: CreateMenuBody, user: dict = Depends(get_current_user)):
     """Trigger crea lista de compras automáticamente (regla 8.1)."""
     client = db(user["_token"])
-    row = await client.insert(
-        "menus",
-        {"mesa_trabajo_id": body.mesa_trabajo_id, "nombre": body.nombre},
-    )
+    data = {"mesa_trabajo_id": body.mesa_trabajo_id, "nombre": body.nombre}
+    if body.fecha_inicio is not None:
+        data["fecha_inicio"] = body.fecha_inicio.isoformat()
+    if body.fecha_fin is not None:
+        data["fecha_fin"] = body.fecha_fin.isoformat()
+
+    row = await client.insert("menus", data)
     if row.get("id"):
         return row
     rows = await client.select(
@@ -92,7 +101,13 @@ async def create_menu(body: CreateMenuBody, user: dict = Depends(get_current_use
 
 @router.patch("/menus/{menu_id}")
 async def update_menu(menu_id: str, body: MenuBody, user: dict = Depends(get_current_user)):
-    row = await db(user["_token"]).update("menus", {"id": menu_id}, {"nombre": body.nombre})
+    data = {"nombre": body.nombre}
+    if body.fecha_inicio is not None:
+        data["fecha_inicio"] = body.fecha_inicio.isoformat()
+    if body.fecha_fin is not None:
+        data["fecha_fin"] = body.fecha_fin.isoformat()
+
+    row = await db(user["_token"]).update("menus", {"id": menu_id}, data)
     if not row:
         raise HTTPException(status_code=404, detail="Menú no encontrado o sin permiso")
     return row
@@ -108,14 +123,17 @@ async def delete_menu(menu_id: str, user: dict = Depends(get_current_user)):
 @router.post("/menu_platillos", status_code=201)
 async def add_platillo_to_menu(body: MenuPlatilloBody, user: dict = Depends(get_current_user)):
     """Trigger sincroniza lista de compras automáticamente."""
-    return await db(user["_token"]).insert(
-        "menu_platillos", {"menu_id": body.menu_id, "platillo_id": body.platillo_id}
-    )
+    data = {"menu_id": body.menu_id, "platillo_id": body.platillo_id}
+    if body.fecha is not None:
+        data["fecha"] = body.fecha.isoformat()
+    if body.segmento_id is not None:
+        data["segmento_id"] = body.segmento_id
+    return await db(user["_token"]).insert("menu_platillos", data)
 
 
 @router.delete("/menu_platillos", status_code=204)
 async def remove_platillo_from_menu(
-    menu_id: str, platillo_id: str, user: dict = Depends(get_current_user)
+    menu_id: str, platillo_id: str, user: dict = Depends(get_current_user), fecha: Optional[date] = None, segmento_id: Optional[str] = None
 ):
     client = db(user["_token"])
     import httpx
@@ -125,11 +143,21 @@ async def remove_platillo_from_menu(
         "Authorization": f"Bearer {user['_token']}",
         "Prefer": "return=minimal",
     }
+    params = {"menu_id": f"eq.{menu_id}", "platillo_id": f"eq.{platillo_id}"}
+    if fecha is not None:
+        params["fecha"] = f"eq.{fecha.isoformat()}"
+    else:
+        params["fecha"] = "is.null"
+    if segmento_id is not None:
+        params["segmento_id"] = f"eq.{segmento_id}"
+    else:
+        params["segmento_id"] = "is.null"
+
     async with httpx.AsyncClient(timeout=20) as http:
         resp = await http.delete(
             f"{settings.supabase_url}/rest/v1/menu_platillos",
             headers=headers,
-            params={"menu_id": f"eq.{menu_id}", "platillo_id": f"eq.{platillo_id}"},
+            params=params,
         )
     resp.raise_for_status()
 

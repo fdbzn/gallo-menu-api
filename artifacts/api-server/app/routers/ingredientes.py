@@ -12,6 +12,7 @@ router = APIRouter(prefix="/ingredientes", tags=["ingredientes"])
 
 class CreateIngredienteBody(BaseModel):
     nombre: str
+    mesa_id: str
     categoria: Optional[str] = None
     stock: Optional[str] = None
 
@@ -35,19 +36,16 @@ async def list_ingredientes(
         None,
         description="PostgREST id filter, e.g. in.(uuid1,uuid2) for shared-menu resolution",
     ),
+    mesa_id: Optional[str] = Query(None, description="Filtra por mesa"),
 ):
-    """
-    Catálogo de inventario = solo propios.
-
-    RLS también permite leer ingredientes de menús compartidos; eso sigue
-    válido vía `id=in.(...)` (detalle de platillo / lista), pero el listado
-    por defecto no debe mezclarlos en el inventario del usuario.
-    """
+    """Catálogo de inventario de la mesa. Resolución puntual vía id=in.(...)."""
     params: dict[str, str] = {"order": "nombre.asc"}
     if id:
         params["id"] = _as_postgrest_filter(id)
+    elif mesa_id:
+        params["mesa_id"] = f"eq.{mesa_id}"
     else:
-        params["creador_id"] = f"eq.{user['sub']}"
+        raise HTTPException(status_code=400, detail="mesa_id es requerido")
     return await db(user["_token"]).select("ingredientes", params)
 
 
@@ -57,6 +55,7 @@ async def create_ingrediente(body: CreateIngredienteBody, user: dict = Depends(g
         "ingredientes",
         {
             "creador_id": user["sub"],
+            "mesa_id": body.mesa_id,
             "nombre": body.nombre,
             "categoria": body.categoria,
             "stock": body.stock,

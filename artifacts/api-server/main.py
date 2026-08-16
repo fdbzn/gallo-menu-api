@@ -14,6 +14,7 @@ from app.routers import (
     listas,
     lugares,
     encuestas,
+    segmentos_menu,
 )
 
 app = FastAPI(
@@ -42,6 +43,7 @@ app.include_router(ingredientes.router)
 app.include_router(listas.router)
 app.include_router(lugares.router)
 app.include_router(encuestas.router)
+app.include_router(segmentos_menu.router)
 
 
 @app.exception_handler(PostgRESTError)

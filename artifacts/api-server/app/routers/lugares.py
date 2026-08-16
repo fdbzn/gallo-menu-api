@@ -1,5 +1,7 @@
 """Módulo 8 — Lugares de compra."""
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app.database import db
@@ -10,27 +12,54 @@ router = APIRouter(prefix="/lugares_compra", tags=["lugares"])
 
 class LugarBody(BaseModel):
     nombre: str
+    mesa_id: Optional[str] = None
+
+
+class CreateLugarBody(BaseModel):
+    nombre: str
+    mesa_id: str
 
 
 @router.get("")
-async def list_lugares(user: dict = Depends(get_current_user)):
-    # RLS returns own + lugares referenced by accepted shared shopping lists
+async def list_lugares(
+    user: dict = Depends(get_current_user),
+    mesa_id: Optional[str] = Query(None, description="Filtra por mesa"),
+):
+    if not mesa_id:
+        raise HTTPException(status_code=400, detail="mesa_id es requerido")
     return await db(user["_token"]).select(
         "lugares_compra",
-        {"order": "nombre.asc"},
+        {"mesa_id": f"eq.{mesa_id}", "order": "nombre.asc"},
     )
 
 
 @router.post("", status_code=201)
-async def create_lugar(body: LugarBody, user: dict = Depends(get_current_user)):
+async def create_lugar(body: CreateLugarBody, user: dict = Depends(get_current_user)):
     return await db(user["_token"]).insert(
-        "lugares_compra", {"creador_id": user["sub"], "nombre": body.nombre}
+        "lugares_compra",
+        {"creador_id": user["sub"], "nombre": body.nombre, "mesa_id": body.mesa_id},
     )
 
 
+class UpdateLugarBody(BaseModel):
+    nombre: str
+
+
+class ReorderLugarBody(BaseModel):
+    orden: int
+
+
 @router.patch("/{lugar_id}")
-async def update_lugar(lugar_id: str, body: LugarBody, user: dict = Depends(get_current_user)):
+async def update_lugar(lugar_id: str, body: UpdateLugarBody, user: dict = Depends(get_current_user)):
     row = await db(user["_token"]).update("lugares_compra", {"id": lugar_id}, {"nombre": body.nombre})
+    if not row:
+        raise HTTPException(status_code=404, detail="Lugar no encontrado")
+    return row
+
+
+@router.patch("/{lugar_id}/orden")
+async def reorder_lugar(lugar_id: str, body: ReorderLugarBody, user: dict = Depends(get_current_user)):
+    row = await db(user["_token"]).update("lugares_compra", {"id": lugar_id}, {"orden": body.orden})
     if not row:
         raise HTTPException(status_code=404, detail="Lugar no encontrado")
     return row

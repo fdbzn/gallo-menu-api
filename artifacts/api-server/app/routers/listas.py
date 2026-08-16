@@ -1,5 +1,5 @@
 """Módulo 8 — Listas de compras."""
-from typing import Optional
+from typing import Literal, Optional
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -15,8 +15,8 @@ class RenameListaBody(BaseModel):
     nombre: str
 
 
-class ToggleCompradoBody(BaseModel):
-    comprado: bool
+class SetEstadoBody(BaseModel):
+    estado: Literal["pendiente", "no_adquirido", "adquirido"]
 
 
 class MoveToLugarBody(BaseModel):
@@ -73,12 +73,13 @@ async def rename_lista(lista_id: str, body: RenameListaBody, user: dict = Depend
 
 # ── Items ─────────────────────────────────────────────────────────────────────
 
-@router.patch("/lista_compra_items/{item_id}/comprado")
-async def toggle_comprado(
-    item_id: str, body: ToggleCompradoBody, user: dict = Depends(get_current_user)
+@router.patch("/lista_compra_items/{item_id}/estado")
+async def set_estado(
+    item_id: str, body: SetEstadoBody, user: dict = Depends(get_current_user)
 ):
+    """Actualiza el estado de adquisición de un item (pendiente / no_adquirido / adquirido)."""
     row = await db(user["_token"]).update(
-        "lista_compra_items", {"id": item_id}, {"comprado": body.comprado}
+        "lista_compra_items", {"id": item_id}, {"estado": body.estado}
     )
     if not row:
         raise HTTPException(status_code=404, detail="Item no encontrado")

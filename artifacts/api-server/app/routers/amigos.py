@@ -29,6 +29,11 @@ async def agregar_amigo(body: AgregarAmigoBody, user: dict = Depends(get_current
     return {"detail": "Amistad creada"}
 
 
+@router.delete("/{amigo_id}", status_code=204)
+async def quitar_amigo(amigo_id: str, user: dict = Depends(get_current_user)):
+    await db(user["_token"]).rpc("quitar_amigo", {"p_amigo_id": amigo_id})
+
+
 @router.get("/check/{amigo_id}")
 async def check_amistad(amigo_id: str, user: dict = Depends(get_current_user)):
     rows = await db(user["_token"]).select(

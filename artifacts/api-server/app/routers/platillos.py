@@ -19,6 +19,7 @@ def _as_postgrest_filter(value: str) -> str:
 
 class CreatePlatilloBody(BaseModel):
     nombre: str
+    mesa_id: str
     tipos: List[int] = []
 
 
@@ -84,15 +85,17 @@ async def list_platillos(
         None,
         description="PostgREST id filter, e.g. in.(uuid1,uuid2) for shared-menu resolution",
     ),
+    mesa_id: Optional[str] = Query(
+        None,
+        description="Filtra catálogo por mesa (requerido salvo resolución por id)",
+    ),
     scope: Optional[str] = Query(
         None,
-        description="catalogo = propios + compartidos aceptados",
+        description="catalogo = platillos de la mesa (RLS)",
     ),
 ):
     """
-    Por defecto / scope=catalogo: propios + platillo_compartido aceptado.
-
-    Resolución puntual vía `id=in.(...)` (menú/encuesta) sigue disponible.
+    Catálogo por mesa_id (RLS). Resolución puntual vía `id=in.(...)`.
     """
     client = db(user["_token"])
     select = (
@@ -108,49 +111,25 @@ async def list_platillos(
                 "order": "nombre.asc",
             },
         )
-
-    propios = await client.select(
+    if not mesa_id:
+        raise HTTPException(status_code=400, detail="mesa_id es requerido")
+    return await client.select(
         "platillos",
         {
-            "creador_id": f"eq.{user['sub']}",
+            "mesa_id": f"eq.{mesa_id}",
             "select": select,
             "order": "nombre.asc",
         },
     )
-    compartidos = await client.select(
-        "platillo_compartido",
-        {
-            "usuario_invitado_id": f"eq.{user['sub']}",
-            "estado": "eq.aceptado",
-            "select": "platillo_id",
-        },
-    )
-    shared_ids = [
-        row["platillo_id"]
-        for row in (compartidos or [])
-        if row.get("platillo_id")
-    ]
-    if not shared_ids:
-        return propios
-
-    shared_rows = await client.select(
-        "platillos",
-        {
-            "id": f"in.({','.join(shared_ids)})",
-            "select": select,
-            "order": "nombre.asc",
-        },
-    )
-    by_id = {row["id"]: row for row in (propios or [])}
-    for row in shared_rows or []:
-        by_id[row["id"]] = row
-    return sorted(by_id.values(), key=lambda r: (r.get("nombre") or "").lower())
 
 
 @router.post("/platillos", status_code=201)
 async def create_platillo(body: CreatePlatilloBody, user: dict = Depends(get_current_user)):
     client = db(user["_token"])
-    platillo = await client.insert("platillos", {"creador_id": user["sub"], "nombre": body.nombre})
+    platillo = await client.insert(
+        "platillos",
+        {"creador_id": user["sub"], "nombre": body.nombre, "mesa_id": body.mesa_id},
+    )
     pid = platillo.get("id")
     if not pid:
         rows = await client.select(
