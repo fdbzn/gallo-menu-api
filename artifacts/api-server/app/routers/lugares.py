@@ -8,6 +8,18 @@ from app.database import db
 from app.deps import get_current_user
 
 router = APIRouter(prefix="/lugares_compra", tags=["lugares"])
+rpc_router = APIRouter(tags=["lugares"])
+
+class BulkReorderBody(BaseModel):
+    p_items: list[dict]
+
+@rpc_router.post("/rpc/reorder_lugares_compra")
+async def bulk_reorder_lugares(body: BulkReorderBody, user: dict = Depends(get_current_user)):
+    await db(user["_token"]).rpc(
+        "reorder_lugares_compra",
+        {"p_items": body.p_items},
+    )
+    return {"status": "ok"}
 
 
 class LugarBody(BaseModel):

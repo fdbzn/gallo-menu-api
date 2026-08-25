@@ -8,6 +8,18 @@ from app.deps import get_current_user
 
 router = APIRouter(tags=["menus"])
 
+class BulkReorderMenuPlatillosBody(BaseModel):
+    p_menu_id: str
+    p_items: list[dict]
+
+@router.post("/rpc/reorder_menu_platillos")
+async def bulk_reorder_menu_platillos(body: BulkReorderMenuPlatillosBody, user: dict = Depends(get_current_user)):
+    await db(user["_token"]).rpc(
+        "reorder_menu_platillos",
+        {"p_menu_id": body.p_menu_id, "p_items": body.p_items},
+    )
+    return {"status": "ok"}
+
 
 class MenuBody(BaseModel):
     nombre: str

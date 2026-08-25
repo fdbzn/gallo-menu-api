@@ -7,6 +7,17 @@ from app.deps import get_current_user
 
 router = APIRouter(tags=["segmentos"])
 
+class BulkReorderSegmentosBody(BaseModel):
+    p_items: list[dict]
+
+@router.post("/rpc/reorder_segmentos_menu")
+async def bulk_reorder_segmentos(body: BulkReorderSegmentosBody, user: dict = Depends(get_current_user)):
+    await db(user["_token"]).rpc(
+        "reorder_segmentos_menu",
+        {"p_items": body.p_items},
+    )
+    return {"status": "ok"}
+
 
 class SegmentoBody(BaseModel):
     mesa_trabajo_id: str

@@ -8,6 +8,7 @@ from app.database import db
 from app.deps import get_current_user
 
 router = APIRouter(prefix="/ingredientes", tags=["ingredientes"])
+cat_router = APIRouter(prefix="/cat_ingredientes_sugeridos", tags=["ingredientes"])
 
 
 class CreateIngredienteBody(BaseModel):
@@ -15,18 +16,27 @@ class CreateIngredienteBody(BaseModel):
     mesa_id: str
     categoria: Optional[str] = None
     stock: Optional[str] = None
+    larga_duracion: Optional[bool] = False
+    origen_id: Optional[str] = None
 
 
 class UpdateIngredienteBody(BaseModel):
     nombre: Optional[str] = None
     categoria: Optional[str] = None
     stock: Optional[str] = None
+    larga_duracion: Optional[bool] = None
 
 
 def _as_postgrest_filter(value: str) -> str:
     if value.startswith(("eq.", "in.", "neq.", "gt.", "gte.", "lt.", "lte.", "like.", "ilike.")):
         return value
     return f"eq.{value}"
+
+
+@cat_router.get("")
+async def list_ingredientes_sugeridos(user: dict = Depends(get_current_user)):
+    """Obtener catálogo de ingredientes sugeridos por Muchi."""
+    return await db(user["_token"]).select("cat_ingredientes_sugeridos", {"order": "nombre.asc"})
 
 
 @router.get("")
@@ -59,6 +69,8 @@ async def create_ingrediente(body: CreateIngredienteBody, user: dict = Depends(g
             "nombre": body.nombre,
             "categoria": body.categoria,
             "stock": body.stock,
+            "larga_duracion": body.larga_duracion,
+            "origen_id": body.origen_id,
         },
     )
 
