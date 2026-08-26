@@ -60,20 +60,49 @@ async def create_mesa(body: MesaBody, user: dict = Depends(get_current_user)):
     row = await client.insert(
         "mesas_trabajo", {"creador_id": user["sub"], "nombre": body.nombre}
     )
-    if row.get("id"):
-        return row
-    rows = await client.select(
-        "mesas_trabajo",
-        {
-            "creador_id": f"eq.{user['sub']}",
-            "nombre": f"eq.{body.nombre}",
-            "order": "created_at.desc",
-            "limit": "1",
-        },
-    )
-    if rows:
-        return rows[0]
-    raise HTTPException(status_code=403, detail="No se pudo crear la mesa")
+    
+    mesa_id = row.get("id")
+    if not mesa_id:
+        rows = await client.select(
+            "mesas_trabajo",
+            {
+                "creador_id": f"eq.{user['sub']}",
+                "nombre": f"eq.{body.nombre}",
+                "order": "created_at.desc",
+                "limit": "1",
+            },
+        )
+        if rows:
+            row = rows[0]
+            mesa_id = row.get("id")
+        else:
+            raise HTTPException(status_code=403, detail="No se pudo crear la mesa")
+
+    # Crear lugares por defecto
+    for idx, lugar in enumerate(["Walmart", "Mercado", "Sam's Club"]):
+        await client.insert(
+            "lugares_compra",
+            {
+                "creador_id": user["sub"],
+                "nombre": lugar,
+                "mesa_id": mesa_id,
+                "orden": idx
+            }
+        )
+
+    # Crear agrupadores por defecto
+    for idx, segmento in enumerate(["Desayuno", "Comida", "Cena", "Postre", "Otro"]):
+        await client.insert(
+            "segmentos_menu",
+            {
+                "creador_id": user["sub"],
+                "nombre": segmento,
+                "mesa_id": mesa_id,
+                "orden": idx
+            }
+        )
+
+    return row
 
 
 @router.patch("/{mesa_id}")

@@ -81,6 +81,12 @@ async def list_menus_by_mesa(mesa_trabajo_id: str, user: dict = Depends(get_curr
     )
 
 
+@router.get("/menus/random-name")
+async def get_random_menu_name(user: dict = Depends(get_current_user)):
+    name = await db(user["_token"]).rpc("get_random_menu_name", {})
+    return {"name": name}
+
+
 @router.post("/menus", status_code=201)
 async def create_menu(body: CreateMenuBody, user: dict = Depends(get_current_user)):
     """Trigger crea lista de compras automáticamente (regla 8.1)."""
