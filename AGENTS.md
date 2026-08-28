@@ -75,7 +75,7 @@ Si tienes conexión con el **MCP de Obsidian** (`obsidianprojects`), consulta el
 - `artifacts/api-server/app/database.py` — pool asyncpg + contexto RLS por request
 - `artifacts/api-server/app/auth.py` — validación JWT: JWKS (ES256) + HS256 legacy
 - `artifacts/api-server/app/deps.py` — dependencia `get_current_user`
-- `artifacts/api-server/app/routers/` — 9 routers por módulo de negocio
+- `artifacts/api-server/app/routers/` — routers por módulo de negocio + `cuenta_confirmada.py` y `reset_password.py` (HTML público de auth)
 
 ## Architecture decisions
 
@@ -89,6 +89,7 @@ Si tienes conexión con el **MCP de Obsidian** (`obsidianprojects`), consulta el
 | # | Módulo | Endpoints |
 |---|--------|-----------|
 | 0 | Perfiles y búsqueda | GET /perfiles/me, PATCH /perfiles/me, GET /perfiles/buscar |
+| auth-web | Páginas HTML públicas | GET /cuenta-confirmada; GET/POST /auth/reset-password |
 | 4 | Mesas de trabajo | CRUD /mesas_trabajo; compartición /mesa_compartida (+ pendientes RPC) |
 | 5 | Menús y compartición | CRUD /menus, /menu_platillos, /menu_compartido (`tipo_cuenta_id`) |
 | 6 | Amigos | GET/POST /amigos, /amigos/agregar |
@@ -135,7 +136,9 @@ tests/
 ├── test_listas.py       # 14 tests — Módulo 8
 ├── test_lugares.py      #  6 tests — Módulo 8
 ├── test_encuestas.py    # 17 tests — Módulo 9
-└── test_e2e.py          #  1 test  — Flujo completo 2 usuarios
+├── test_e2e.py          #  1 test  — Flujo completo 2 usuarios
+├── test_cuenta_confirmada.py
+└── test_reset_password.py
 ```
 
 ### Cómo funcionan

@@ -41,7 +41,7 @@ async def list_lugares(
         raise HTTPException(status_code=400, detail="mesa_id es requerido")
     return await db(user["_token"]).select(
         "lugares_compra",
-        {"mesa_id": f"eq.{mesa_id}", "order": "nombre.asc"},
+        {"mesa_id": f"eq.{mesa_id}", "order": "orden.asc,nombre.asc"},
     )
 
 

@@ -124,8 +124,15 @@ class PostgREST:
 
     async def delete(self, table: str, filters: dict) -> int:
         params = {k: f"eq.{v}" for k, v in filters.items()}
-        result = await self._req("DELETE", f"/{table}", params=params, prefer="return=minimal")
-        return 1  # PostgREST returns 204 on success
+        result = await self._req(
+            "DELETE",
+            f"/{table}",
+            params=params,
+            prefer="return=representation",
+        )
+        if isinstance(result, list):
+            return len(result)
+        return 1 if result else 0
 
     async def rpc(self, func: str, params: dict) -> Any:
         result = await self._req("POST", f"/rpc/{func}", json=params, prefer="")

@@ -133,7 +133,12 @@ async def update_menu(menu_id: str, body: MenuBody, user: dict = Depends(get_cur
 
 @router.delete("/menus/{menu_id}", status_code=204)
 async def delete_menu(menu_id: str, user: dict = Depends(get_current_user)):
-    await db(user["_token"]).delete("menus", {"id": menu_id})
+    deleted = await db(user["_token"]).delete("menus", {"id": menu_id})
+    if not deleted:
+        raise HTTPException(
+            status_code=404,
+            detail="Menú no encontrado o sin permiso para borrarlo",
+        )
 
 
 # ── Platillos del menú ────────────────────────────────────────────────────────

@@ -38,7 +38,7 @@ async def list_segmentos(mesa_trabajo_id: str, user: dict = Depends(get_current_
         "segmentos_menu",
         {
             "mesa_id": f"eq.{mesa_trabajo_id}",
-            "order": "created_at.asc",
+            "order": "orden.asc,created_at.asc",
         },
     )
 

@@ -15,6 +15,9 @@ from app.routers import (
     lugares,
     encuestas,
     segmentos_menu,
+    siguiente_compra,
+    cuenta_confirmada,
+    reset_password,
 )
 
 app = FastAPI(
@@ -33,6 +36,8 @@ app.add_middleware(
 )
 
 # ── Routers ──────────────────────────────────────────────────────────────────
+app.include_router(cuenta_confirmada.router)
+app.include_router(reset_password.router)
 app.include_router(perfiles.router)
 app.include_router(mesas.router)
 app.include_router(mesas.compartir_router)
@@ -46,6 +51,7 @@ app.include_router(lugares.router)
 app.include_router(lugares.rpc_router)
 app.include_router(encuestas.router)
 app.include_router(segmentos_menu.router)
+app.include_router(siguiente_compra.router)
 
 
 @app.exception_handler(PostgRESTError)

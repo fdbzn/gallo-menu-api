@@ -24,6 +24,12 @@ class TestGetMyProfile:
 
 class TestUpdateMyProfile:
     async def test_updates_nombre(self, client, auth_headers, mock_db):
+        mock_db.select_one.return_value = {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "nombre": "Test User",
+            "nombres": "Test",
+            "apellidos": "User",
+        }
         mock_db.update.return_value = {
             "id": "550e8400-e29b-41d4-a716-446655440000",
             "nombre": "Nuevo Nombre",
@@ -34,8 +40,32 @@ class TestUpdateMyProfile:
         assert resp.status_code == 200
         assert resp.json()["nombre"] == "Nuevo Nombre"
 
+    async def test_updates_nombres_recalculates_nombre(self, client, auth_headers, mock_db):
+        mock_db.select_one.return_value = {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "nombre": "Ana Pérez",
+            "nombres": "Ana",
+            "apellidos": "Pérez",
+        }
+        mock_db.update.return_value = {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "nombre": "Ana María Pérez",
+            "nombres": "Ana María",
+            "apellidos": "Pérez",
+        }
+        resp = await client.patch(
+            "/perfiles/me",
+            headers=auth_headers,
+            json={"nombres": "Ana María", "apellidos": "Pérez"},
+        )
+        assert resp.status_code == 200
+        mock_db.update.assert_awaited()
+        payload = mock_db.update.await_args.args[2]
+        assert payload["nombre"] == "Ana María Pérez"
+        assert payload["nombres"] == "Ana María"
+
     async def test_returns_404_when_not_found(self, client, auth_headers, mock_db):
-        mock_db.update.return_value = None
+        mock_db.select_one.return_value = None
         resp = await client.patch(
             "/perfiles/me", headers=auth_headers, json={"nombre": "No"}
         )

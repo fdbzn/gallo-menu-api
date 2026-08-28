@@ -44,6 +44,8 @@ class AddItemManualBody(BaseModel):
     ingrediente_id: str
     agregado_manualmente: bool = True
     lugar_compra_id: Optional[str] = None
+    cantidad: Optional[str] = None
+    orden: int = 0
 
 
 class AssignItemPlatilloBody(BaseModel):
@@ -126,14 +128,17 @@ async def reorder_item(
 @router.post("/lista_compra_items", status_code=201)
 async def add_item_manual(body: AddItemManualBody, user: dict = Depends(get_current_user)):
     """Items sueltos sobreviven aunque se quiten platillos (regla 8.9)."""
-    return await db(user["_token"]).insert(
+    return await db(user["_token"]).upsert(
         "lista_compra_items",
         {
             "lista_compra_id": body.lista_compra_id,
             "ingrediente_id": body.ingrediente_id,
             "agregado_manualmente": body.agregado_manualmente,
             "lugar_compra_id": body.lugar_compra_id,
+            "cantidad": body.cantidad,
+            "orden": body.orden,
         },
+        on_conflict="lista_compra_id, ingrediente_id"
     )
 
 

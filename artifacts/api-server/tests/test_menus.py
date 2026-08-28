@@ -48,6 +48,11 @@ class TestDeleteMenu:
         resp = await client.delete("/menus/menu1", headers=auth_headers)
         assert resp.status_code == 204
 
+    async def test_delete_returns_404_when_nothing_deleted(self, client, auth_headers, mock_db):
+        mock_db.delete.return_value = 0
+        resp = await client.delete("/menus/ghost", headers=auth_headers)
+        assert resp.status_code == 404
+
 
 class TestMenuPlatillos:
     async def test_adds_platillo(self, client, auth_headers, mock_db):
