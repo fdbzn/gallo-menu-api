@@ -25,6 +25,15 @@ class TestResetPasswordGet:
         assert resp.status_code == 200
         assert "Enlace inválido" in resp.text
         assert "muchi://login" in resp.text
+        assert 'id="field-access-token"' in resp.text
+        assert "window.location.hash" in resp.text
+
+    async def test_root_trampolines_to_reset_password(self, client):
+        resp = await client.get("/")
+        assert resp.status_code == 200
+        assert "location.replace" in resp.text
+        assert "/api/auth/reset-password" in resp.text
+        assert "/api/cuenta-confirmada" in resp.text
 
     async def test_also_serves_api_prefix(self, client):
         resp = await client.get(
@@ -139,3 +148,27 @@ class TestResetPasswordPost:
         put_kwargs = inner.put.await_args
         assert put_kwargs.kwargs["json"] == {"password": "nuevaclave1"}
         assert "Bearer access-1" in put_kwargs.kwargs["headers"]["Authorization"]
+
+    async def test_access_token_skips_verify(self, client):
+        ctx, inner = _httpx_client(
+            post_resp=_json_response(ok=True, payload={"access_token": "should-not-use"}),
+            put_resp=_json_response(ok=True, payload={}),
+        )
+        with patch("app.routers.reset_password.httpx.AsyncClient", return_value=ctx):
+            resp = await client.post(
+                "/auth/reset-password",
+                data={
+                    "access_token": "implicit-access",
+                    "refresh_token": "implicit-refresh",
+                    "type": "recovery",
+                    "password": "nuevaclave1",
+                    "confirm_password": "nuevaclave1",
+                },
+            )
+        assert resp.status_code == 200
+        assert "Contraseña actualizada" in resp.text
+        inner.post.assert_not_awaited()
+        inner.put.assert_awaited()
+        put_kwargs = inner.put.await_args
+        assert put_kwargs.kwargs["json"] == {"password": "nuevaclave1"}
+        assert "Bearer implicit-access" in put_kwargs.kwargs["headers"]["Authorization"]

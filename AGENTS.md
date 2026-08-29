@@ -89,7 +89,7 @@ Si tienes conexión con el **MCP de Obsidian** (`obsidianprojects`), consulta el
 | # | Módulo | Endpoints |
 |---|--------|-----------|
 | 0 | Perfiles y búsqueda | GET /perfiles/me, PATCH /perfiles/me, GET /perfiles/buscar |
-| auth-web | Páginas HTML públicas | GET /cuenta-confirmada; GET/POST /auth/reset-password |
+| auth-web | Páginas HTML públicas | GET / (trampolín recovery); GET /cuenta-confirmada; GET/POST /auth/reset-password |
 | 4 | Mesas de trabajo | CRUD /mesas_trabajo; compartición /mesa_compartida (+ pendientes RPC) |
 | 5 | Menús y compartición | CRUD /menus, /menu_platillos, /menu_compartido (`tipo_cuenta_id`) |
 | 6 | Amigos | GET/POST /amigos, /amigos/agregar |
