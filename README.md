@@ -1,6 +1,6 @@
 # Gallo Menu API
 
-Backend API colaborativo para planear menús en equipo, gestionar encuestas grupales y organizar listas de compras por lugar de compra.
+Backend API colaborativo para planear menús en equipo y organizar listas de compras por lugar de compra.
 
 ## 🚀 Tech Stack
 
