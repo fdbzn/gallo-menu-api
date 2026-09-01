@@ -55,7 +55,7 @@ class TestResetPasswordGet:
         assert "tok123" in body
         assert "muchi://reset-password" in body
         assert "token_hash=tok123" in body
-        assert "Abrir en Muchi" in body
+        assert "Abrir en Moussi" in body
 
     async def test_code_only_skips_web_form(self, client):
         resp = await client.get(
@@ -64,7 +64,7 @@ class TestResetPasswordGet:
         )
         assert resp.status_code == 200
         assert 'name="password"' not in resp.text
-        assert "Abrir en Muchi" in resp.text
+        assert "Abrir en Moussi" in resp.text
         assert "code=pkce-code" in resp.text
 
     async def test_shows_error_from_query(self, client):
@@ -142,7 +142,7 @@ class TestResetPasswordPost:
             )
         assert resp.status_code == 200
         assert "Contraseña actualizada" in resp.text
-        assert "Abre Muchi" in resp.text
+        assert "Abre Moussi" in resp.text
         inner.post.assert_awaited()
         inner.put.assert_awaited()
         put_kwargs = inner.put.await_args

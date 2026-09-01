@@ -47,14 +47,14 @@ def _page(*, ok: bool, title: str, message: str) -> str:
     button = (
         f'<a class="btn" href="{deep_link}">Abrir la app</a>'
         if ok
-        else f'<a class="btn" href="{deep_link}">Ir a Muchi</a>'
+        else f'<a class="btn" href="{deep_link}">Ir a Moussi</a>'
     )
     return f"""<!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{safe_title} · Muchi</title>
+  <title>{safe_title} · Moussi</title>
   <style>
     :root {{
       --primary: #9c27b0;
@@ -123,7 +123,7 @@ def _page(*, ok: bool, title: str, message: str) -> str:
     <div id="ok" class="{'hidden' if not ok else ''}">
       <div class="badge">{icon if ok else '✓'}</div>
       <h1>¡Todo listo!</h1>
-      <p>Tu cuenta de Muchi está confirmada. Abre la app para iniciar sesión.</p>
+      <p>Tu cuenta de Moussi está confirmada. Abre la app para iniciar sesión.</p>
       {button if ok else ''}
     </div>
     <div id="fail" class="{'hidden' if ok else ''}">
@@ -184,6 +184,6 @@ async def cuenta_confirmada(
         _page(
             ok=True,
             title="Cuenta confirmada",
-            message="Tu cuenta de Muchi está confirmada.",
+            message="Tu cuenta de Moussi está confirmada.",
         )
     )

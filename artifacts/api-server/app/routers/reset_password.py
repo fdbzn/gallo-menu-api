@@ -163,7 +163,7 @@ def _shell(*, title: str, inner: str) -> str:
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{safe_title} · Muchi</title>
+  <title>{safe_title} · Moussi</title>
   <style>
     :root {{
       --primary: #9c27b0;
@@ -305,7 +305,7 @@ def _form_inner(
       <input id="confirm_password" name="confirm_password" type="password" minlength="{_MIN_PASSWORD_LEN}" required autocomplete="new-password" />
       <button class="btn" type="submit">Actualizar contraseña</button>
     </form>
-    <a id="open-app" class="btn secondary" href="{deep_link}">Abrir en Muchi</a>"""
+    <a id="open-app" class="btn secondary" href="{deep_link}">Abrir en Moussi</a>"""
 
 
 def _landing_page(
@@ -323,8 +323,8 @@ def _landing_page(
     form_class = "" if (has_server_token or code_only) else "hidden"
     if code_only:
         form_html = f"""
-      <p>Abre la app Muchi para continuar. Si el enlace no abre sola, pulsa el botón.</p>
-      <a id="open-app" class="btn" href="{html.escape(_reset_deep_link(token_hash=None, type_=type_, code=code), quote=True)}">Abrir en Muchi</a>"""
+      <p>Abre la app Moussi para continuar. Si el enlace no abre sola, pulsa el botón.</p>
+      <a id="open-app" class="btn" href="{html.escape(_reset_deep_link(token_hash=None, type_=type_, code=code), quote=True)}">Abrir en Moussi</a>"""
     else:
         form_html = _form_inner(
             token_hash=token_hash,
@@ -351,7 +351,7 @@ def _landing_page(
   </main>
   <main id="form-wrap" class="card {form_class}">
     <h1>Nueva contraseña</h1>
-    <p>Elige una contraseña nueva para tu cuenta de Muchi. También puedes continuar en la app.</p>
+    <p>Elige una contraseña nueva para tu cuenta de Moussi. También puedes continuar en la app.</p>
     {form_html}
   </main>"""
     return _shell(title="Nueva contraseña", inner=inner)
@@ -379,7 +379,7 @@ def _trampoline_page() -> str:
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Muchi</title>
+  <title>Moussi</title>
 </head>
 <body>
   <p>Redirigiendo…</p>
@@ -503,6 +503,6 @@ async def reset_password_post(
         _result_page(
             ok=True,
             title="Contraseña actualizada",
-            message="Tu contraseña se cambió correctamente. Abre Muchi e inicia sesión.",
+            message="Tu contraseña se cambió correctamente. Abre Moussi e inicia sesión.",
         )
     )
