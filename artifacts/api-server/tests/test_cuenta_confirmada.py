@@ -8,7 +8,7 @@ class TestCuentaConfirmada:
         assert "text/html" in resp.headers["content-type"]
         body = resp.text
         assert "Todo listo" in body
-        assert "muchi://login" in body
+        assert "moussi://login" in body
         assert "Abrir la app" in body
 
     async def test_also_serves_api_prefix(self, client):

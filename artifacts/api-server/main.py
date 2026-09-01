@@ -18,6 +18,7 @@ from app.routers import (
     siguiente_compra,
     cuenta_confirmada,
     reset_password,
+    privacidad,
 )
 
 app = FastAPI(
@@ -38,6 +39,7 @@ app.add_middleware(
 # ── Routers ──────────────────────────────────────────────────────────────────
 app.include_router(cuenta_confirmada.router)
 app.include_router(reset_password.router)
+app.include_router(privacidad.router)
 app.include_router(perfiles.router)
 app.include_router(mesas.router)
 app.include_router(mesas.compartir_router)

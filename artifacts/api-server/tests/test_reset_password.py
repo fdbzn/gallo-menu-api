@@ -24,7 +24,7 @@ class TestResetPasswordGet:
         resp = await client.get("/auth/reset-password")
         assert resp.status_code == 200
         assert "Enlace inválido" in resp.text
-        assert "muchi://login" in resp.text
+        assert "moussi://login" in resp.text
         assert 'id="field-access-token"' in resp.text
         assert "window.location.hash" in resp.text
 
@@ -53,7 +53,7 @@ class TestResetPasswordGet:
         assert "Nueva contraseña" in body
         assert 'name="token_hash"' in body
         assert "tok123" in body
-        assert "muchi://reset-password" in body
+        assert "moussi://reset-password" in body
         assert "token_hash=tok123" in body
         assert "Abrir en Moussi" in body
 
