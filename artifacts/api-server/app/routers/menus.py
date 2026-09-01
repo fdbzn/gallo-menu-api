@@ -75,7 +75,7 @@ async def list_menus_by_mesa(mesa_trabajo_id: str, user: dict = Depends(get_curr
         "menus",
         {
             "mesa_trabajo_id": f"eq.{mesa_trabajo_id}",
-            "select": "*,menu_platillos(id,platillo_id,fecha,segmento_id,platillos(nombre)),menu_compartido(*,cat_tipos_cuenta(id,codigo,nombre))",
+            "select": "*,menu_platillos(id,platillo_id,fecha,segmento_id,excluir_de_lista_compras,platillos(nombre)),menu_compartido(*,cat_tipos_cuenta(id,codigo,nombre))",
             "order": "created_at.desc",
         },
     )

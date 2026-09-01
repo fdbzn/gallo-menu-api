@@ -15,8 +15,8 @@ class Settings(BaseSettings):
     supabase_url: str
     supabase_anon_key: str
     supabase_jwt_secret: str
-    app_deep_link: str = "muchi://login"
-    app_password_reset_deep_link: str = "muchi://reset-password"
+    app_deep_link: str = "moussi://login"
+    app_password_reset_deep_link: str = "moussi://reset-password"
 
     model_config = SettingsConfigDict(
         env_file=_ENV_FILE if _ENV_FILE.is_file() else None,

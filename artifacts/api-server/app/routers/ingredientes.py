@@ -35,7 +35,7 @@ def _as_postgrest_filter(value: str) -> str:
 
 @cat_router.get("")
 async def list_ingredientes_sugeridos(user: dict = Depends(get_current_user)):
-    """Obtener catálogo de ingredientes sugeridos por Muchi."""
+    """Obtener catálogo de ingredientes sugeridos por Moussi."""
     return await db(user["_token"]).select("cat_ingredientes_sugeridos", {"order": "nombre.asc"})
 
 

@@ -28,7 +28,7 @@ _CONFIRM_PATH = "/api/cuenta-confirmada"
 
 
 def _login_deep_link() -> str:
-    return settings.app_deep_link.strip() or "muchi://login"
+    return settings.app_deep_link.strip() or "moussi://login"
 
 
 def _reset_deep_link(
@@ -39,7 +39,7 @@ def _reset_deep_link(
     access_token: Optional[str] = None,
     refresh_token: Optional[str] = None,
 ) -> str:
-    base = settings.app_password_reset_deep_link.strip() or "muchi://reset-password"
+    base = settings.app_password_reset_deep_link.strip() or "moussi://reset-password"
     params: dict[str, str] = {}
     if token_hash:
         params["token_hash"] = token_hash
@@ -109,7 +109,7 @@ async def _update_password(access_token: str, password: str) -> Optional[str]:
 
 def _hash_script() -> str:
     deep_link_js = json.dumps(
-        settings.app_password_reset_deep_link.strip() or "muchi://reset-password"
+        settings.app_password_reset_deep_link.strip() or "moussi://reset-password"
     )
     return f"""
 <script>

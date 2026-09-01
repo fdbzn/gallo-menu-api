@@ -14,7 +14,7 @@ router = APIRouter(tags=["auth-web"])
 
 
 def _deep_link() -> str:
-    return settings.app_deep_link.strip() or "muchi://login"
+    return settings.app_deep_link.strip() or "moussi://login"
 
 
 async def _verify_token(token_hash: str, type_: str) -> tuple[bool, Optional[str]]:
